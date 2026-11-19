@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CV Monitor – abandoned & removed object detection</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header><div class="in">
+  <div class="brand" id="logo"><i></i>CV Monitor <span>/ video analytics</span></div>
+  <nav id="nav">
+    <button data-p="monitor" class="on">Monitor</button>
+    <button data-p="setup">Setup</button>
+    <button data-p="settings">Settings</button>
+    <button data-p="history">History</button>
+    <button data-p="results">Results</button>
+    <button data-p="about">How it works</button>
+  </nav>
+  <label class="chip snd" title="Beep when an alarm is raised"><input type="checkbox" id="sound"> sound</label>
+  <span id="statePill" class="pill">idle</span>
+  <button class="btn cta sm" id="navStart">Start monitoring</button>
+</div></header>
+
+<main>
+<!-- =========================== MONITOR =========================== -->
+<section id="p-monitor" class="page on">
+  <div class="hero dark"><div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="eyebrow">Classical computer vision · software only</div>
+        <h1>Left objects.<br>Removed items.<br>Tampered cameras.</h1>
+        <p class="lede">Watches a scene, tells <i>abandoned</i> from <i>removed</i>, ignores shadows and lighting, and raises an alarm with a snapshot and an evidence clip.</p>
+        <div class="console">
+          <div class="row2">
+            <select id="src" title="video file or frame folder"></select>
+            <label class="btn" for="file" title="upload a video from your computer">Upload…</label>
+            <input id="file" type="file" accept="video/*" hidden>
+          </div>
+          <div class="row2" style="margin-top:8px">
+            <input id="customSrc" type="text" placeholder="webcam 0  or  rtsp://…" size="20" title="live camera index or RTSP/HTTP URL">
+            <select id="speed" title="playback speed">
+              <option value="1">real time</option><option value="2">2×</option>
+              <option value="4">4×</option><option value="0">max speed</option>
+            </select>
+          </div>
+          <div class="row2" style="margin-top:12px">
+            <button class="btn cta" id="bStart">Start</button>
+            <button class="btn" id="bPause" disabled>Pause</button>
+            <button class="btn danger" id="bStop" disabled>Stop</button>
+          </div>
+          <div class="chips" id="chips"></div>
+          <div id="warnBox"></div>
+        </div>
+      </div>
+      <div>
+        <div class="video" id="videoBox">
+          <img id="video" alt="" style="display:none">
+          <div class="ph" id="ph">Pick a source and press <b>&nbsp;Start&nbsp;</b>.<br>No video yet? Run <code>python tools/make_demo_clip.py</code> once.</div>
+          <div class="badge" id="badge" style="display:none"></div>
+        </div>
+        <div class="bar"><div id="progress"></div></div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="sec"><div class="wrap">
+    <h3 class="t">Live status</h3>
+    <div class="kpis">
+      <div class="kpi"><b id="kT">0:00</b><span>video time</span></div>
+      <div class="kpi"><b id="kF">–</b><span>pipeline FPS</span></div>
+      <div class="kpi"><b id="kO">0</b><span>objects tracked</span></div>
+      <div class="kpi alarm"><b id="kA">0</b><span>alarms</span></div>
+      <div class="kpi warn"><b id="kW">0</b><span>warnings</span></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="tabs" id="rtabs">
+          <button data-t="events" class="on">Events</button>
+          <button data-t="objects">Objects</button>
+          <button data-t="gallery">Alarm shots</button>
+        </div>
+        <div id="t-events" class="list"></div>
+        <div id="t-objects" class="list" style="display:none"></div>
+        <div id="t-gallery" class="gallery" style="display:none"></div>
+      </div>
+      <div class="card">
+        <h3 class="t">Live signals</h3>
+        <div class="charts">
+          <div class="chart"><small>pipeline FPS</small><canvas class="ch" id="c1"></canvas></div>
+          <div class="chart"><small>changed pixels (long-term foreground)</small><canvas class="ch" id="c2"></canvas></div>
+          <div class="chart"><small>people (green) / tracked objects (blue)</small><canvas class="ch" id="c3"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- =========================== SETUP =========================== -->
+<section id="p-setup" class="page"><div class="wrap">
+  <div class="pagehead"><div class="eyebrow">Setup</div><h2>Zones &amp; calibration</h2>
+    <p>Tell the monitor where to look and how far things really are. Coordinates are stored in processed-frame pixels, so they stay valid for any video from this camera.</p></div>
+  <div class="setup">
+    <div class="card">
+      <div class="row">
+        <select id="setupSrc" class="btn" style="min-width:240px"></select>
+        <button class="btn primary sm" id="loadRef">Load frame</button>
+      </div>
+      <div class="toolbar" id="tools">
+        <button class="btn sm on" data-tool="inc">Draw ‘watch’ zone</button>
+        <button class="btn sm" data-tool="ign">Draw ‘ignore’ zone</button>
+        <button class="btn sm" data-tool="cal">Calibrate floor (4 points)</button>
+        <button class="btn sm" data-tool="meas">Measure scale (2 points)</button>
+        <button class="btn sm" id="undo">Undo point</button>
+        <button class="btn sm" id="clearTool">Cancel</button>
+      </div>
+      <div class="hint" id="toolHint"></div>
+      <div class="canvaswrap"><canvas id="cv" width="640" height="360"></canvas></div>
+    </div>
+    <div class="stack">
+      <div class="card">
+        <h3 class="t">Zones</h3>
+        <div class="hint">No watch zone = the whole picture is watched. Ignore zones (doors, screens, trees) are always skipped.</div>
+        <div id="zoneList"></div>
+        <div class="controls"><button class="btn primary" id="saveZones">Save zones</button></div>
+      </div>
+      <div class="card">
+        <h3 class="t">Distance calibration</h3>
+        <div class="hint" id="calStatus"></div>
+        <div id="calForm" style="display:none">
+          <div class="hint">Enter the real floor coordinates (metres) of the 4 clicked points, e.g. the corners of a rectangle you measured: (0,0) (4,0) (4,2) (0,2).</div>
+          <div id="calInputs"></div>
+          <div class="controls"><button class="btn primary" id="saveCal">Save homography</button></div>
+        </div>
+        <div id="measForm" style="display:none">
+          <div class="row">Real distance between the 2 points: <input type="number" id="measM" value="1" step="0.1" min="0.1"> m
+            <button class="btn primary sm" id="saveMeas">Save scale</button></div>
+        </div>
+        <div class="controls"><button class="btn sm" id="resetCal">Remove calibration</button></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- =========================== SETTINGS =========================== -->
+<section id="p-settings" class="page"><div class="wrap">
+  <div class="pagehead"><div class="eyebrow">Settings</div><h2>Tune the monitor</h2>
+    <p>Items tagged <span class="tag">live</span> apply instantly while a video is running; <span class="tag rs">restart</span> items apply the next time you press Start.
+    “Save as defaults” keeps your values in <code>data/user_settings.json</code>.</p></div>
+  <div id="settingsBox"></div>
+  <div class="controls" style="margin-bottom:30px">
+    <button class="btn primary" id="saveSet">Save as defaults</button>
+    <button class="btn danger" id="resetSet">Reset to config.yaml</button>
+  </div>
+</div></section>
+
+<!-- =========================== HISTORY =========================== -->
+<section id="p-history" class="page"><div class="wrap">
+  <div class="pagehead"><div class="eyebrow">History</div><h2>Every run, kept.</h2>
+    <p>Events, snapshots and evidence clips (5 s before and 6 s after each alarm) are stored per run in <code>out/</code>.</p></div>
+  <div class="grid" style="margin-top:12px">
+    <div class="card"><table><thead><tr><th>Run</th><th>When</th><th>Events</th><th>Alarms</th><th>Clips</th></tr></thead><tbody id="runRows"></tbody></table>
+      <div class="empty" id="runEmpty" style="display:none">No runs yet.</div></div>
+    <div class="card"><h3 class="t" id="runTitle">Select a run</h3><div id="runClips"></div><div class="list" id="runEvents"></div></div>
+  </div>
+</div></section>
+
+<!-- =========================== RESULTS =========================== -->
+<section id="p-results" class="page"><div class="wrap">
+  <div class="pagehead"><div class="eyebrow">Results</div><h2>Does it actually work?</h2>
+    <p>Event-level precision / recall on <code>data/labels.csv</code>, plus the ablation study. Tune on some clips, report on others.</p></div>
+  <div class="stat4">
+    <div><b id="sF1">–</b><span>F1 score</span></div>
+    <div><b id="sPR">–</b><span>precision / recall</span></div>
+    <div><b id="sFA">–</b><span>false alarms / hour</span></div>
+    <div><b id="sFPS">–</b><span>pipeline FPS</span></div>
+  </div>
+  <div class="card" style="margin-top:22px">
+    <div class="controls" style="margin-top:0">
+      <button class="btn primary" id="jEval">Run evaluation</button>
+      <button class="btn" id="jAbl">Run all ablations</button>
+      <span class="hint">Ablations take several minutes.</span>
+    </div>
+    <pre class="log" id="jobLog" style="display:none"></pre>
+  </div>
+  <div class="card" style="margin-top:22px"><h3 class="t">Event-level metrics (eval/results.json)</h3><div id="evalTable" class="empty">Not run yet.</div></div>
+  <div class="card" style="margin-top:22px"><h3 class="t">Ablation study (eval/ablations.md)</h3><div id="ablTable" class="empty">Not run yet.</div></div>
+  <div class="card" style="margin:22px 0 30px"><h3 class="t">Figures (report/figures)</h3><div class="figs" id="figs"><div class="empty">No figures yet.</div></div></div>
+</div></section>
+
+<!-- =========================== ABOUT =========================== -->
+<section id="p-about" class="page"><div class="wrap">
+  <div class="pagehead"><div class="eyebrow">How it works</div><h2>Detect. Verify. Alert.</h2>
+    <p>Classical computer vision does the thinking; libraries do the heavy lifting.</p></div>
+  <div class="trio">
+    <div><h4>Detect</h4><p>A fast and a slow background model disagree about anything that stopped: that is a static candidate.</p></div>
+    <div><h4>Verify</h4><p>Edge test, shadow test, lighting check and an optional CNN decide: abandoned, removed, shadow or just moved.</p></div>
+    <div><h4>Alert</h4><p>Owner distance in real metres, a timer, a state machine, then snapshot, clip and notification.</p></div>
+  </div>
+  <div class="steps" style="margin-top:36px">
+    <div class="step"><span class="n">01</span><h4>Camera-health gate</h4><p>Blocked, blurred, frozen, shifted or disconnected camera raises a tamper alarm and pauses object logic.</p></div>
+    <div class="step"><span class="n">02</span><h4>Dual background</h4><p>A fast model absorbs a stopped object in seconds, a slow model remembers the empty scene. Static candidate = long-term foreground and not short-term foreground.</p></div>
+    <div class="step"><span class="n">03</span><h4>Shadows &amp; lighting</h4><p>Brightness-ratio, colour and texture tests plus a global lighting-versus-scene-change check keep false alarms down.</p></div>
+    <div class="step"><span class="n">04</span><h4>Verification</h4><p>The edge test on the blob boundary decides abandoned versus removed; an optional 6-channel CNN (current plus background crop) can override it.</p></div>
+    <div class="step"><span class="n">05</span><h4>Owner logic</h4><p>The nearest person when the object stopped is the owner; distance is measured on the floor plane and the owner is re-identified after tracker ID switches.</p></div>
+    <div class="step"><span class="n">06</span><h4>State machine</h4><p>CANDIDATE → STATIC → UNATTENDED → ALARM, with presence authentication through occlusion. Every alarm saves a snapshot, a CSV row and an evidence clip.</p></div>
+  </div>
+  <div class="card legend" style="margin:30px 0">
+    <h3 class="t">Colours on the video</h3>
+    <span><i style="background:#00b8d4"></i>candidate</span><span><i style="background:#f5b800"></i>static</span><span><i style="background:#ff8a00"></i>unattended</span>
+    <span><i style="background:#e5322d"></i>alarm</span><span><i style="background:#1f9d55"></i>people</span><span><i style="background:rgba(31,157,85,.35)"></i>watch zone</span><span><i style="background:rgba(229,50,45,.35)"></i>ignore zone</span>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div class="cols">
+    <div><div class="big">Ready to catch what was left behind?</div><p style="margin-top:18px"><button class="btn cta" id="footStart">Start monitoring</button></p></div>
+    <div><h5>Monitor</h5><span class="l" data-go="monitor">Live view</span><span class="l" data-go="setup">Zones &amp; calibration</span><span class="l" data-go="history">History</span></div>
+    <div><h5>Project</h5><span class="l" data-go="settings">Settings</span><span class="l" data-go="results">Results</span><span class="l" data-go="about">How it works</span></div>
+    <div><h5>Based on</h5><span style="color:#d6d6dc;display:block;margin:6px 0;font-size:13px">Porikli, Ivanov &amp; Haga, <i>Robust Abandoned Object Detection Using Dual Foregrounds</i>, EURASIP JASP 2008.</span></div>
+  </div>
+  <div class="fine">Classical computer vision, in software. Local single-user tool: keep it on 127.0.0.1 unless you trust your network.</div>
+</div></footer>
+
+<div id="modal"><div class="box" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.pytest_cache/
+
+out/*
+!out/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+data/synth/
+data/user_settings.json
+gui_settings.yaml
+eval/results.json
+eval/ablations.csv
+eval/ablations.md
+
+# ignore all videos and weights, then re-allow only the sample
+*.mp4
+*.avi
+*.mov
+*.mpg
+*.pt
+data/clips/*
+!data/clips/.gitkeep
+!data/clips/demo.mp4

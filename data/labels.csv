@@ -1,0 +1,5 @@
+video,type,t_start,t_end
+demo.mp4,abandoned,14,63
+demo.mp4,removed,25,32
+demo.mp4,tamper,75,85
+demo.mp4,tamper,90,96

@@ -1,0 +1,16 @@
+# Use Python 3.10-3.12 (3.11 recommended). Python 3.15 has no torch/opencv wheels yet.
+opencv-python>=4.8,<5   # HOG people detector needs 4.x. If cv2.imshow breaks after installing albumentations:
+                        #   pip uninstall -y opencv-python-headless && pip install --force-reinstall "opencv-python<5"
+numpy
+pyyaml
+pandas
+scikit-learn
+matplotlib
+flask              # the web GUI (python app.py)
+requests           # optional: Telegram alerts
+tabulate
+ultralytics        # YOLOv8 + ByteTrack people tracking (AGPL-3.0 licence, see README)
+torch              # CNN verifier + training
+torchvision
+albumentations     # CNN training augmentation
+pytest             # optional, `python tests/run_all.py` works without it

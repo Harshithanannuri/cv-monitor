@@ -1,0 +1,100 @@
+# ---- everything tunable lives here. All times are in SECONDS, distances in METRES ----
+source:
+  path: data/clips/demo.mp4        # video file OR folder of frames (PETS2006 JPEGs)
+  process_fps: 10                  # frames actually processed per second
+  fps_override: null               # set 25 for PETS2006 frame folders
+  resize_width: 640
+
+pipeline:                          # switches used by the ablation study
+  bg_mode: dual                    # dual | single
+  backend: ra                      # ra (own running average) | mog2 | knn
+  shadow: true
+  verify: both                     # none | rule | cnn | both
+  people: yolo                     # yolo | hog | none
+  tamper: true
+  global_check: true
+
+preprocess: {clahe: false, clahe_clip: 2.0, clahe_tile: 8, blur_ksize: 5}   # CLAHE is an ablation switch
+
+background:
+  tau_fast_s: 2.0                  # fast model absorbs a stopped object in ~2-3 s
+  tau_slow_s: 90.0                 # slow model remembers the scene for minutes
+  warmup_s: 3.0
+  diff_thr: 28
+  use_gradient: true               # edge channel helps when object colour ~ floor colour
+  grad_thr: 45
+
+shadow: {v_lo: 0.40, v_hi: 0.95, h_tol: 12, s_tol: 40, sat_min_for_hue: 40,
+         grad_lo: 0.6, grad_hi: 1.4, grad_bias: 3.0}
+
+candidates: {min_area_px: 350, max_area_frac: 0.25, open_k: 3, close_k: 7, person_overlap: 0.4, max_aspect: 3.0, max_blobs: 10}   # max_aspect = max height/width of a blob
+
+global_change: {fg_frac: 0.45, edge_corr: 0.55, adapt_alpha: 0.3, scene_confirm_s: 3.0}
+
+verify:
+  edge_margin: 0.12                # |score| above this = decisive abandoned / removed
+  ring_px: 3
+  artifact_corr: 0.85              # edge-map correlation above this = same content (shadow / light)
+  cnn_conf: 0.85
+  weights: models/cnn6.pt
+  cnn_size: 96
+  sift_min_inliers: 8
+  presence_ncc: 0.55
+  presence_pad: 12
+
+tracking:
+  match_iou: 0.3
+  static_s: 4.0                    # blob must persist this long before it is verified
+  gap_s: 3.0                       # tolerated blob dropout (occlusion, crowd)
+  presence_every_s: 1.5
+  remove_s: 3.0                    # template absent this long => object taken
+
+owner:                             # PETS2006: warning > 2 m, alarm > 3 m for 30 s
+  warn_m: 2.0
+  alarm_m: 3.0
+  alarm_s: 30.0
+  lookback_s: 10.0
+  assign_max_m: 2.5
+  lost_s: 5.0
+  px_per_m: 60                     # used only when no homography is given
+  reid: true                       # re-identify the owner after a tracker ID switch (colour signature)
+  reid_thr: 0.4                    # Bhattacharyya distance, lower = more similar
+  max_speed_mps: 3.0               # plausibility limit for a re-identified person
+
+homography:                        # 4+ floor points in PROCESSED-frame pixels -> metres
+  image_points: null               # e.g. [[120,300],[520,300],[600,350],[40,350]]
+  world_points: null               # e.g. [[0,0],[4,0],[4,2],[0,2]]
+
+people: {model: yolov8n.pt, conf: 0.35, imgsz: 640, every: 2}
+
+tamper:
+  dark_mean: 12
+  low_std: 3
+  blur_ratio: 0.35
+  frozen_eps: 0.02
+  confirm_s: {blocked: 2, blurred: 3, frozen: 5, shifted: 2, disconnected: 3}
+  orb_features: 600
+  shift_every_s: 1.0
+  shift_px: 25
+  rot_deg: 3
+  min_inliers: 12
+  phase_resp: 0.03                 # min per-block phase-correlation confidence (block consensus, see tamper.py)
+  ref_refresh_s: 60
+  rebase_s: 30                     # persistent shift: accept the new view as normal
+
+alerts:
+  out_dir: out
+  write_files: true
+  save_snapshots: true
+  cooldown_s: 20
+  telegram: {enabled: false, token_env: TG_TOKEN, chat_env: TG_CHAT, kinds: [alarm, tamper]}
+
+zones:                             # drawn in the GUI (Setup page); processed-frame pixels
+  include: []                      # e.g. [[[100,200],[500,200],[500,340],[100,340]]]  (empty = whole frame)
+  ignore: []                       # e.g. a door, a screen, trees in the wind
+
+clips:                             # short video around every alarm
+  enabled: true
+  pre_s: 5
+  post_s: 6
+  kinds: [alarm, removed, tamper]
